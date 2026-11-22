@@ -1,0 +1,38 @@
+name: Cloudflare sandbox image
+
+# Builds, checks and pushes the sandbox image for the cloudflare sandbox provider. The image must
+# be built on native amd64, so this runs here rather than on a contributor's machine.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "cloudflare-sandbox-image-*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.7"
+      - name: Build, check and push
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_REGISTRY_PASSWORD: ${{ secrets.CLOUDFLARE_REGISTRY_PASSWORD }}
+        run: python3 packages/sandbox-images/cli.py build --provider cloudflare --output "$RUNNER_TEMP/image.json"
+      # The account id is part of the reference, so only the digest is published.
+      - name: Report the image digest
+        run: |
+          digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reference"].split("@")[1])' "$RUNNER_TEMP/image.json")
+          echo "openinspect-sandbox@$digest" >> "$GITHUB_STEP_SUMMARY"
+          echo "digest=$digest"

@@ -161,6 +161,7 @@ def test_vercel_transitive_build_inputs_are_covered(checkout, source):
         ("ec2", "packages/ec2-infra/openinspect-sandbox.service"),
         ("ec2", "packages/ec2-infra/build-ami.py"),
         ("ec2", "packages/ec2-infra/image_scripts.py"),
+        ("cloudflare", "packages/cloudflare-infra/build-image.py"),
     ],
 )
 def test_vm_provider_hash_covers_launcher_builder_and_deployment(checkout, provider, source):
