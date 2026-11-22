@@ -68,9 +68,19 @@ copy, so set `NEXT_PUBLIC_SANDBOX_PROVIDER` to `cloudflare` on the web app separ
 
 ## What was measured
 
-Measured on 2026-11-22 with a throwaway Worker on a `standard-4` instance (4 vCPU, 12 GiB memory, 18
-GB usable disk), using a Debian image with Node 24, PostgreSQL 16, pgvector and Chromium. Not yet
-measured with the real sandbox image.
+Measured on 2026-11-22 on a `standard-4` instance (4 vCPU, 12 GiB memory, 18 GB usable disk).
+
+With the sandbox image this repository builds (2.8 GB on disk):
+
+| Check                                                      | Result              |
+| ---------------------------------------------------------- | ------------------- |
+| The image's own service checks (`smoke_test.py verify`)    | Pass, in 19 seconds |
+| Installing PostgreSQL 16 and pgvector from a `setup.sh`    | 15 seconds          |
+| Snapshot after that install, 267 MB changed                | 7 seconds           |
+| Restore into a different Durable Object, to first command  | 21 seconds          |
+| Files and PostgreSQL data after the restore and `start.sh` | Intact              |
+
+With a smaller Debian image carrying Node 24, PostgreSQL 16, pgvector and Chromium:
 
 | Check                                                    | Result                                                 |
 | -------------------------------------------------------- | ------------------------------------------------------ |
