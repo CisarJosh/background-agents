@@ -62,6 +62,7 @@ export default tseslint.config(
       "**/.cloudflare/**",
       "**/.vinext/**",
       "**/.next/**",
+      "**/.open-next/**",
       "**/.source/**",
       "**/build/**",
       "**/.wrangler/**",
