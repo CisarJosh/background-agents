@@ -37,7 +37,7 @@ describe("session diff responses", () => {
         `${BASE_URL}/sessions/session%2F1/diff/rev%201/files/file%2F..%2F2`,
         expect.objectContaining({
           method: "GET",
-          redirect: "error",
+          redirect: "manual",
           headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
           signal: expect.any(AbortSignal),
         })

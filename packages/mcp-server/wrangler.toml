@@ -1,0 +1,11 @@
+# Serves the MCP server over Streamable HTTP for clients that are not on your machine.
+# Deploy with: wrangler deploy
+name = "open-inspect-mcp"
+main = "src/worker.ts"
+compatibility_date = "2025-08-15"
+# The control plane is another Worker on the same account; without this flag a fetch to its public
+# URL is refused.
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+[vars]
+CONTROL_PLANE_URL = "https://open-inspect-control-plane.YOUR-SUBDOMAIN.workers.dev"

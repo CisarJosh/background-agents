@@ -4,6 +4,24 @@ MCP server over the Open-Inspect control plane. It runs locally over stdio, so a
 Claude Code or an IDE can inspect sessions, read automation runs, start and steer sessions, create
 and run automations, and manage skills without the web UI.
 
+## Run it remotely
+
+`src/worker.ts` serves the same tools over Streamable HTTP from a Cloudflare Worker, at `/mcp`, for
+clients that are not on the machine holding the token: a hosted assistant, a phone, another agent.
+Set `CONTROL_PLANE_URL` in `wrangler.toml` and run `wrangler deploy`.
+
+The caller sends its own personal access token as `Authorization: Bearer oi_pat_…`. The Worker holds
+no token and stores nothing: it passes the caller's token to the control plane, which checks it on
+every call. A request without a well-formed token gets a 401.
+
+```bash
+claude mcp add --transport http open-inspect https://<your-mcp-worker>/mcp \
+  --header "Authorization: Bearer oi_pat_..."
+```
+
+A token you paste into a hosted assistant's connector settings is held by that service. Give it a
+token with only the permissions that assistant needs, and a short lifetime.
+
 ## Security model
 
 Requests authenticate with a **personal access token** you issue to yourself in the web UI
@@ -126,6 +144,8 @@ Each tool's description states the grant it needs, so the assistant can tell you
 | `get_automation_run`          | `GET /automations/:id/runs/:runId`                 | `automations.read`                                                             |
 | `create_automation`           | `POST /automations`                                | `automations.create`, `sessions.create`                                        |
 | `trigger_automation`          | `POST /automations/:id/trigger`                    | `automations.trigger.own` or `.any`, `sessions.create`                         |
+| `stop_session`                | `POST /sessions/:id/stop`                          | `sessions.read`, `sessions.lifecycle`                                          |
+| `list_session_artifacts`      | `GET /sessions/:id/artifacts`                      | `sessions.read`                                                                |
 | `start_session`               | `POST /sessions`, `POST /sessions/:id/prompt`      | `sessions.read`, `sessions.create`, `sessions.collaborate`, `repositories.use` |
 | `send_session_prompt`         | `POST /sessions/:id/prompt`                        | `sessions.read`, `sessions.collaborate`                                        |
 | `list_skills`                 | `GET /skills`                                      | `skills.read`                                                                  |

@@ -204,9 +204,10 @@ export class ControlPlaneClient {
         method,
         headers,
         ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-        // A redirect would carry the bearer token to wherever the response points. The control
-        // plane never redirects an API call, so one means something in between is misbehaving.
-        redirect: "error",
+        // A redirect would carry the bearer token to wherever the response points, so it is
+        // returned rather than followed and refused below. ("error" would say the same, but the
+        // Workers runtime does not implement it.)
+        redirect: "manual",
         signal: this.signal ? AbortSignal.any([this.signal, controller.signal]) : controller.signal,
       });
       // Inside the same timer as the fetch: `fetch` resolves on headers, so a control plane that
@@ -224,6 +225,16 @@ export class ControlPlaneClient {
       throw new ControlPlaneError(`${method} ${path} failed: ${reason}`, null);
     } finally {
       clearTimeout(timer);
+    }
+
+    // The control plane never redirects an API call, so one means something in between is
+    // misbehaving.
+    if (response.status >= 300 && response.status < 400) {
+      throw new ControlPlaneError(
+        `${method} ${path} was redirected (${response.status}); refusing to follow, since that ` +
+          "would send the token elsewhere",
+        response.status
+      );
     }
 
     if (!response.ok) {

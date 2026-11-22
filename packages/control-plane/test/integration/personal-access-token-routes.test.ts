@@ -147,6 +147,18 @@ describe("starting and steering sessions with a token", () => {
     expect((await withToken(writer, "/sessions", { method: "POST", body: {} })).status).toBe(201);
     expect((await withToken(writer, `/sessions/${sessionName}/prompt`, prompt)).ok).toBe(true);
   });
+  it("stops a session only with sessions.lifecycle, and lists artifacts with sessions.read", async () => {
+    const { sessionName } = await initSession({ userId: OWNER });
+    const reader = await issueToken(OWNER, ["sessions.read"]);
+    const stop = { method: "POST", body: {} };
+
+    expect((await withToken(reader, `/sessions/${sessionName}/artifacts`)).status).toBe(200);
+    expect((await withToken(reader, `/sessions/${sessionName}/stop`, stop)).status).toBe(403);
+
+    const operator = await issueToken(OWNER, ["sessions.read", "sessions.lifecycle"]);
+    expect((await withToken(operator, `/sessions/${sessionName}/stop`, stop)).ok).toBe(true);
+  });
+
   it("prompts under no account unless the token was granted personal memory", async () => {
     const promptAccount = async (grant: PermissionId[], content: string) => {
       const { stub, sessionName } = await initSession({ userId: OWNER });

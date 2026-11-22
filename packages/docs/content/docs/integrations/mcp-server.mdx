@@ -41,8 +41,10 @@ The control plane URL must use `https://`; plain `http://` is accepted only for 
 | Tool                                                                                                       | Needs the token to hold                                                                         |
 | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `list_sessions`, `get_session_events`, `get_session_messages`, `get_session_diff`, `get_session_diff_file` | **Read sessions**                                                                               |
-| `start_session`                                                                                            | **Read sessions**, **Create sessions**, **Collaborate on sessions**, and use of the repository  |
-| `send_session_prompt`                                                                                      | **Read sessions** and **Collaborate on sessions**                                               |
+| `list_session_artifacts`                                                                                   | **Read sessions**                                                                               |
+| `stop_session`                                                                                             | **Read sessions** and **Manage session lifecycle**                                              |
+| `start_session`                                                                                            | **Read sessions**, **Create sessions**, **Collaborate in sessions**, and use of the repository  |
+| `send_session_prompt`                                                                                      | **Read sessions** and **Collaborate in sessions**                                               |
 | `list_automations`, `list_automation_invocations`, `get_automation_run`                                    | **Read automations**                                                                            |
 | `list_skills`                                                                                              | **Read skills**                                                                                 |
 | `create_automation`                                                                                        | **Create automations**, **Create sessions**, and use of its targets                             |
@@ -50,6 +52,12 @@ The control plane URL must use `https://`; plain `http://` is accepted only for 
 | `import_skill_from_git`, `update_skill_from_git`                                                           | **Manage skills** (administrators), which always comes with **Read skills**                     |
 
 A token without a tool's permission gets an error, which usually names the missing permission or points to the tool's description, where the needed grant is stated. The token never exceeds your own role or your workspace's [token policy](/administration/personal-access-tokens), and nothing it does can delete or pause an automation, delete a skill, or read or change secrets or workspace settings through the API. A run started with `trigger_automation` uses only what the token was granted, even where your role allows more.
+
+## Use it from somewhere else
+
+The server can also run as a Cloudflare Worker that serves the same tools over HTTP, for an assistant that is not on your machine. Deploy `packages/mcp-server` with Wrangler after setting `CONTROL_PLANE_URL` in its `wrangler.toml`, then point the client at `https://<your-mcp-worker>/mcp` and send your token as an `Authorization: Bearer` header. The Worker keeps no token of its own; it passes yours to the control plane on each call.
+
+A token pasted into a hosted assistant's settings is held by that service, so give it only the permissions that assistant needs and a short lifetime.
 
 ## Keep the assistant in check
 

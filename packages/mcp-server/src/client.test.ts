@@ -273,10 +273,15 @@ describe("ControlPlaneClient", () => {
   });
 
   it("refuses to follow a redirect, which would carry the token elsewhere", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({}));
-    await new ControlPlaneClient({ baseUrl: BASE_URL, token: TOKEN }).get("/sessions");
+    fetchMock.mockImplementation(
+      async () => new Response(null, { status: 302, headers: { Location: "https://evil.test/" } })
+    );
+    const client = new ControlPlaneClient({ baseUrl: BASE_URL, token: TOKEN });
 
-    expect(fetchMock.mock.calls[0][1].redirect).toBe("error");
+    await expect(client.get("/sessions")).rejects.toThrow(/was redirected \(302\); refusing/);
+    // Returned to this client rather than followed by the runtime, which is the only request made.
+    expect(fetchMock.mock.calls[0][1].redirect).toBe("manual");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("says what to do when the token is rejected", async () => {

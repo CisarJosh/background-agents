@@ -378,6 +378,7 @@ sessionRuntimeProxyRoutes.post(
     authorization: requireSession("lifecycle", {
       actorlessGrants: [{ service: "linear-bot" }],
     }),
+    personalAccessTokens: "accept",
   }),
   (c) =>
     dispatchSession(
@@ -417,6 +418,7 @@ sessionRuntimeProxyRoutes.get(
     authorization: requireSession("read", {
       actorlessGrants: [{ service: "slack-bot" }, { service: "linear-bot" }],
     }),
+    personalAccessTokens: "accept",
   }),
   (c) => dispatchSession(c, simpleProxy({ internalPath: SessionInternalPaths.artifacts }))
 );

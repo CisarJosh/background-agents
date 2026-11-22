@@ -109,10 +109,11 @@ describe("tool surface", () => {
       "import_skill_from_git",
       "send_session_prompt",
       "start_session",
+      "stop_session",
       "trigger_automation",
       "update_skill_from_git",
     ]);
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(17);
     // Re-import moves the skill's current revision, which is what later
     // sessions load; a client reads this to decide how hard to prompt.
     const hints = Object.fromEntries(
@@ -133,7 +134,7 @@ describe("tool surface", () => {
     await mcpClient.close();
   });
 
-  it("keeps the writes to these six, each behind a route that accepts tokens", () => {
+  it("keeps the writes to these seven, each behind a route that accepts tokens", () => {
     // A new write tool needs a control-plane route to accept personal access tokens first,
     // which is the review this list stands in for.
     const writes = TOOLS.filter((candidate) => !candidate.readOnly).map(
@@ -145,6 +146,7 @@ describe("tool surface", () => {
       "import_skill_from_git",
       "send_session_prompt",
       "start_session",
+      "stop_session",
       "trigger_automation",
       "update_skill_from_git",
     ]);
@@ -570,6 +572,21 @@ describe("send_session_prompt", () => {
     await expect(
       tool("send_session_prompt").run(client, { session_id: "s-1", prompt: "   " })
     ).rejects.toThrow();
+  });
+});
+
+describe("stop_session and list_session_artifacts", () => {
+  it("stops a session and reads its artifacts by escaped id", async () => {
+    const { client, get, post } = fakeClient({
+      get: () => ({ artifacts: [] }),
+      post: () => ({ status: "stopped" }),
+    });
+
+    await tool("stop_session").run(client, { session_id: "s/1" });
+    await tool("list_session_artifacts").run(client, { session_id: "s/1" });
+
+    expect(post.mock.calls[0].slice(0, 2)).toEqual(["/sessions/s%2F1/stop", {}]);
+    expect(get.mock.calls[0][0]).toBe("/sessions/s%2F1/artifacts");
   });
 });
 

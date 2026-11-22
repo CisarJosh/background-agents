@@ -382,6 +382,32 @@ export const TOOLS: ToolDefinition[] = [
       }),
   }),
   defineTool({
+    name: "stop_session",
+    requires: "sessions.read and sessions.lifecycle",
+    title: "Stop a session's current prompt",
+    readOnly: false,
+    description:
+      "Interrupt the prompt a session is running right now. Prompts queued behind it are not " +
+      "cancelled: the next one starts. The sandbox keeps running. The call answers " +
+      '{"status":"stopping"} even when nothing was running, so read get_session_messages ' +
+      "afterwards. Branches already pushed and pull requests already opened stay as they are, " +
+      "and the session still accepts send_session_prompt.",
+    inputSchema: { session_id: sessionId },
+    run: (client, args) => client.post(`/sessions/${encodeURIComponent(args.session_id)}/stop`, {}),
+  }),
+  defineTool({
+    name: "list_session_artifacts",
+    requires: "sessions.read",
+    title: "List what a session produced",
+    readOnly: true,
+    description:
+      "List a session's artifacts: the pull requests and branches it created, and the " +
+      "screenshots and other media it uploaded, each with its URL. Use it to find the pull " +
+      "request to review once a session reports it is done.",
+    inputSchema: { session_id: sessionId },
+    run: (client, args) => client.get(`/sessions/${encodeURIComponent(args.session_id)}/artifacts`),
+  }),
+  defineTool({
     name: "list_automations",
     requires: "automations.read",
     title: "List automations",
