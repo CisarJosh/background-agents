@@ -62,9 +62,18 @@ const BRANCH_NAME_PATTERN = /^[\w.\-/]+$/;
  * so they go without, except a Slack direct message, which is as private as a web session.
  */
 function personalMemoryInclusion(
+  ctx: RequestContext,
   spawnSource: SpawnSource | undefined,
   body: Pick<CreateSessionInput, "includePersonalMemories" | "directMessage">
 ): boolean | undefined {
+  // Memory access is decided from the owner's role, which a token's grant does not narrow, so a
+  // token that was not granted personal memory goes without it here.
+  if (
+    ctx.principal?.kind === "personal-access-token" &&
+    !ctx.authorization?.permissions.includes("memories.manage_own")
+  ) {
+    return false;
+  }
   switch (spawnSource) {
     case "user":
       return body.includePersonalMemories;
@@ -318,7 +327,7 @@ export async function handleCreateSession(
     principal: { userId: resolvedUserId, ownerTeamId: teamId },
     repositories: scopeMembers,
     environmentId,
-    includePersonalMemories: personalMemoryInclusion(spawnSource, body),
+    includePersonalMemories: personalMemoryInclusion(ctx, spawnSource, body),
   });
 
   const input: SessionInitInput = {
@@ -382,6 +391,7 @@ sessionCreateRoutes.post(
     ...GITHUB_USER_OR_SERVICE_ROUTE,
     authorization: requirePermission("sessions.create"),
     serviceActorClaims: extractSessionActorProfileClaims,
+    personalAccessTokens: "accept",
   }),
   (c) => dispatch(c, handleCreateSession)
 );

@@ -1,8 +1,8 @@
 # @open-inspect/mcp-server
 
 MCP server over the Open-Inspect control plane. It runs locally over stdio, so an MCP client such as
-Claude Code or an IDE can inspect sessions, read automation runs, create and run automations, and
-manage skills without the web UI.
+Claude Code or an IDE can inspect sessions, read automation runs, start and steer sessions, create
+and run automations, and manage skills without the web UI.
 
 ## Security model
 
@@ -31,6 +31,7 @@ give it the shortest lifetime that works.
 | You want the assistant to…               | Grant                                                                                         |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Investigate sessions and automation runs | `sessions.read`, `automations.read`, `skills.read`                                            |
+| Also start and steer sessions            | add `sessions.create`, `sessions.collaborate`, and `repositories.use`                         |
 | Also run existing automations            | add `automations.trigger.own` (or `.any`), `sessions.create`, and the targets' use permission |
 | Also create automations                  | add `automations.create`, `sessions.create`, and `repositories.use` and/or `environments.use` |
 | Also import and update skills            | add `skills.manage` (the picker adds `skills.read` with it)                                   |
@@ -45,6 +46,9 @@ that content goes straight into your assistant's context. Treat it as untrusted.
 transcript or diff can ask the assistant to call a write tool. A write tool used that way acts with
 your authority:
 
+- A session started or prompted this way runs at once, in a sandbox, as you. It can push branches
+  and open pull requests, and it receives the secrets its repository's sessions receive.
+  `send_session_prompt` can steer any session you can collaborate on.
 - An automation runs its instructions later, in a sandbox, as you. It has your repository and
   environment access, and the secrets those sessions receive.
 - A skill with a `global` assignment loads into every later session in the workspace, not just
@@ -59,7 +63,8 @@ Three things limit this:
   approve tools automatically will not ask. Check yours before you grant write permissions, and read
   what a write is about to create before you approve it.
 - Automations and skills created this way are visible in the dashboard and audit log, and you can
-  delete them there.
+  delete them there. A session is visible there too and can be stopped, but stopping it does not
+  undo a branch it already pushed or a pull request it already opened.
 
 For investigation, a read-only token is the right default.
 
@@ -109,21 +114,23 @@ check that the command printed something.
 
 Each tool's description states the grant it needs, so the assistant can tell you what is missing.
 
-| Tool                          | Route                                              | Grant                                                  |
-| ----------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
-| `list_sessions`               | `GET /sessions`                                    | `sessions.read`                                        |
-| `get_session_events`          | `GET /sessions/:id/events`                         | `sessions.read`                                        |
-| `get_session_messages`        | `GET /sessions/:id/messages`                       | `sessions.read`                                        |
-| `get_session_diff`            | `GET /sessions/:id/diff`                           | `sessions.read`                                        |
-| `get_session_diff_file`       | `GET /sessions/:id/diff/:revisionId/files/:fileId` | `sessions.read`                                        |
-| `list_automations`            | `GET /automations`                                 | `automations.read`                                     |
-| `list_automation_invocations` | `GET /automations/:id/invocations`                 | `automations.read`                                     |
-| `get_automation_run`          | `GET /automations/:id/runs/:runId`                 | `automations.read`                                     |
-| `create_automation`           | `POST /automations`                                | `automations.create`, `sessions.create`                |
-| `trigger_automation`          | `POST /automations/:id/trigger`                    | `automations.trigger.own` or `.any`, `sessions.create` |
-| `list_skills`                 | `GET /skills`                                      | `skills.read`                                          |
-| `import_skill_from_git`       | `POST /skills/import` (+ preview)                  | `skills.read`, `skills.manage`                         |
-| `update_skill_from_git`       | `POST /skills/:id/reimport` (+ …)                  | `skills.read`, `skills.manage`                         |
+| Tool                          | Route                                              | Grant                                                                          |
+| ----------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `list_sessions`               | `GET /sessions`                                    | `sessions.read`                                                                |
+| `get_session_events`          | `GET /sessions/:id/events`                         | `sessions.read`                                                                |
+| `get_session_messages`        | `GET /sessions/:id/messages`                       | `sessions.read`                                                                |
+| `get_session_diff`            | `GET /sessions/:id/diff`                           | `sessions.read`                                                                |
+| `get_session_diff_file`       | `GET /sessions/:id/diff/:revisionId/files/:fileId` | `sessions.read`                                                                |
+| `list_automations`            | `GET /automations`                                 | `automations.read`                                                             |
+| `list_automation_invocations` | `GET /automations/:id/invocations`                 | `automations.read`                                                             |
+| `get_automation_run`          | `GET /automations/:id/runs/:runId`                 | `automations.read`                                                             |
+| `create_automation`           | `POST /automations`                                | `automations.create`, `sessions.create`                                        |
+| `trigger_automation`          | `POST /automations/:id/trigger`                    | `automations.trigger.own` or `.any`, `sessions.create`                         |
+| `start_session`               | `POST /sessions`, `POST /sessions/:id/prompt`      | `sessions.read`, `sessions.create`, `sessions.collaborate`, `repositories.use` |
+| `send_session_prompt`         | `POST /sessions/:id/prompt`                        | `sessions.read`, `sessions.collaborate`                                        |
+| `list_skills`                 | `GET /skills`                                      | `skills.read`                                                                  |
+| `import_skill_from_git`       | `POST /skills/import` (+ preview)                  | `skills.read`, `skills.manage`                                                 |
+| `update_skill_from_git`       | `POST /skills/:id/reimport` (+ …)                  | `skills.read`, `skills.manage`                                                 |
 
 `create_automation` and `trigger_automation` also need `repositories.use` or `environments.use` for
 the automation's targets, the same checks you face in the web UI. A triggered run uses only what the

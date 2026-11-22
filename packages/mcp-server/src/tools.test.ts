@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { MAX_AUTOMATION_NAME_LENGTH } from "@open-inspect/shared/types/automations";
 import { z } from "zod";
-import type { ControlPlaneClient } from "./client";
+import { ControlPlaneError, type ControlPlaneClient } from "./client";
 import { TOOLS, type ToolDefinition } from "./tools";
 
 function tool(name: string): ToolDefinition {
@@ -107,10 +107,12 @@ describe("tool surface", () => {
     expect(writes.map((entry) => entry.name).sort()).toEqual([
       "create_automation",
       "import_skill_from_git",
+      "send_session_prompt",
+      "start_session",
       "trigger_automation",
       "update_skill_from_git",
     ]);
-    expect(tools).toHaveLength(13);
+    expect(tools).toHaveLength(15);
     // Re-import moves the skill's current revision, which is what later
     // sessions load; a client reads this to decide how hard to prompt.
     const hints = Object.fromEntries(
@@ -131,7 +133,7 @@ describe("tool surface", () => {
     await mcpClient.close();
   });
 
-  it("keeps the writes to these four, each behind a route that accepts tokens", () => {
+  it("keeps the writes to these six, each behind a route that accepts tokens", () => {
     // A new write tool needs a control-plane route to accept personal access tokens first,
     // which is the review this list stands in for.
     const writes = TOOLS.filter((candidate) => !candidate.readOnly).map(
@@ -141,6 +143,8 @@ describe("tool surface", () => {
     expect(writes.sort()).toEqual([
       "create_automation",
       "import_skill_from_git",
+      "send_session_prompt",
+      "start_session",
       "trigger_automation",
       "update_skill_from_git",
     ]);
@@ -499,6 +503,73 @@ describe("trigger_automation", () => {
     await tool("trigger_automation").run(client, { automation_id: "auto/../1" });
 
     expect(post).toHaveBeenCalledWith("/automations/auto%2F..%2F1/trigger", {});
+  });
+});
+
+describe("start_session", () => {
+  it("creates the session, then sends the first prompt to it", async () => {
+    const { client, post } = fakeClient({
+      post: (path) => (path === "/sessions" ? { sessionId: "s/1", status: "created" } : {}),
+    });
+
+    const result = await tool("start_session").run(client, {
+      repo_owner: "acme",
+      repo_name: "web-app",
+      prompt: "Fix the flaky checkout test",
+      branch: "main",
+    });
+
+    expect(post.mock.calls[0].slice(0, 2)).toEqual([
+      "/sessions",
+      expect.objectContaining({ repoOwner: "acme", repoName: "web-app", branch: "main" }),
+    ]);
+    expect(post.mock.calls[1].slice(0, 2)).toEqual([
+      "/sessions/s%2F1/prompt",
+      { content: "Fix the flaky checkout test" },
+    ]);
+    expect(result).toEqual({ sessionId: "s/1" });
+  });
+
+  it("names the session it created when the first prompt is refused", async () => {
+    const { client } = fakeClient({
+      post: (path) => {
+        if (path === "/sessions") return { sessionId: "s-1" };
+        throw new ControlPlaneError("403 missing sessions.collaborate", 403);
+      },
+    });
+
+    await expect(
+      tool("start_session").run(client, { repo_owner: "acme", repo_name: "web-app", prompt: "x" })
+    ).rejects.toThrow(/Session s-1 was created.*not accepted.*sessions\.collaborate/);
+  });
+
+  it("does not claim a refusal when the first prompt may have been delivered", async () => {
+    const { client } = fakeClient({
+      post: (path) => {
+        if (path === "/sessions") return { sessionId: "s-1" };
+        throw new ControlPlaneError("Request timed out", null);
+      },
+    });
+
+    await expect(
+      tool("start_session").run(client, { repo_owner: "acme", repo_name: "web-app", prompt: "x" })
+    ).rejects.toThrow(/Session s-1 was created, but it is unknown.*get_session_messages/);
+  });
+});
+
+describe("send_session_prompt", () => {
+  it("posts the prompt to the session and refuses a blank one", async () => {
+    const { client, post } = fakeClient({ post: () => ({ messageId: "m-1" }) });
+
+    await tool("send_session_prompt").run(client, { session_id: "s-1", prompt: "Also add a test" });
+
+    expect(post.mock.calls[0].slice(0, 2)).toEqual([
+      "/sessions/s-1/prompt",
+      { content: "Also add a test" },
+    ]);
+    await expect(
+      tool("send_session_prompt").run(client, { session_id: "s-1", prompt: "   " })
+    ).rejects.toThrow();
   });
 });
 

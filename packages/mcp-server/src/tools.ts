@@ -36,7 +36,7 @@ import {
   skillSchema,
 } from "@open-inspect/shared/types/skills";
 import { z } from "zod";
-import type { ControlPlaneClient } from "./client";
+import { ControlPlaneError, type ControlPlaneClient } from "./client";
 
 /**
  * Page caps, matching what the control-plane handlers themselves enforce.
@@ -302,6 +302,84 @@ export const TOOLS: ToolDefinition[] = [
         `/sessions/${encodeURIComponent(args.session_id)}/diff` +
           `/${encodeURIComponent(args.revision_id)}/files/${encodeURIComponent(args.file_id)}`
       ),
+  }),
+  defineTool({
+    name: "start_session",
+    requires:
+      "sessions.read, sessions.create and sessions.collaborate, plus repositories.use for the " +
+      "repository",
+    title: "Start a session",
+    readOnly: false,
+    description:
+      "Start a new background session on a repository and give it its first prompt. Returns " +
+      "the sessionId; follow its progress with get_session_events and steer it with " +
+      "send_session_prompt. The session runs in a sandbox as you and can push a branch and " +
+      "open a pull request, so state the outcome wanted, what must not change, and how the " +
+      "result will be judged.",
+    inputSchema: {
+      repo_owner: repoOwner,
+      repo_name: repoName,
+      prompt: z.string().trim().min(1).describe("The first prompt: the task for the agent"),
+      branch: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Base branch; the repository default if omitted"),
+      title: z.string().min(1).optional(),
+      harness: z.string().min(1).optional().describe("Agent harness id; the default if omitted"),
+      model: z.string().min(1).optional().describe("Model id; the workspace default if omitted"),
+    },
+    run: async (client, args) => {
+      const created = parseResponse(
+        z.object({ sessionId: z.string().min(1) }),
+        await client.post("/sessions", {
+          repoOwner: args.repo_owner,
+          repoName: args.repo_name,
+          branch: args.branch,
+          title: args.title,
+          harness: args.harness,
+          model: args.model,
+        }),
+        "start_session"
+      );
+      try {
+        await client.post(`/sessions/${encodeURIComponent(created.sessionId)}/prompt`, {
+          content: args.prompt,
+        });
+      } catch (error) {
+        // The session exists; say so, or a retry would start a second one.
+        const detail = error instanceof Error ? error.message : String(error);
+        // A refusal has a status. A timeout or network error has none, and may have been delivered.
+        const refused = error instanceof ControlPlaneError && error.status !== null;
+        throw new Error(
+          refused
+            ? `Session ${created.sessionId} was created but its first prompt was not accepted; ` +
+                `send it with send_session_prompt. ${detail}`
+            : `Session ${created.sessionId} was created, but it is unknown whether its first ` +
+                `prompt was delivered; check get_session_messages before sending it again with ` +
+                `send_session_prompt. ${detail}`
+        );
+      }
+      return created;
+    },
+  }),
+  defineTool({
+    name: "send_session_prompt",
+    requires: "sessions.read and sessions.collaborate",
+    title: "Send a follow-up prompt",
+    readOnly: false,
+    description:
+      "Send a prompt to an existing session. A prompt sent while the agent is working steers " +
+      "or queues behind the current turn; one sent to a stopped session wakes it. Read the " +
+      "result with get_session_events.",
+    inputSchema: {
+      session_id: sessionId,
+      prompt: z.string().trim().min(1).describe("The follow-up prompt"),
+    },
+    run: (client, args) =>
+      client.post(`/sessions/${encodeURIComponent(args.session_id)}/prompt`, {
+        content: args.prompt,
+      }),
   }),
   defineTool({
     name: "list_automations",

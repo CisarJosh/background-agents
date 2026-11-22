@@ -10,6 +10,7 @@ import type { PermissionId } from "@open-inspect/shared/rbac";
 import { AutomationStore } from "../../src/db/automation-store";
 import { PersonalAccessTokenStore } from "../../src/db/personal-access-tokens";
 import { SessionIndexStore } from "../../src/db/session-index";
+import { SessionMemorySelectionStore } from "../../src/db/session-memory-selections";
 import { cleanD1Tables } from "./cleanup";
 import { initSession, seedActiveUser, seedEvents } from "./helpers";
 import { fetchRuns } from "./run-helpers";
@@ -118,7 +119,6 @@ describe("reading sessions with a token", () => {
     for (const [method, path] of [
       ["GET", `/sessions/${sessionName}/tunnel-urls`],
       ["GET", `/sessions/${sessionName}/sandbox-access`],
-      ["POST", "/sessions"],
       ["POST", `/sessions/${sessionName}/archive`],
     ] as const) {
       await expectRefusal(
@@ -127,6 +127,41 @@ describe("reading sessions with a token", () => {
         "personal_access_token_not_accepted"
       );
     }
+  });
+});
+
+describe("starting and steering sessions with a token", () => {
+  it("needs sessions.create to start one and sessions.collaborate to prompt one", async () => {
+    const { sessionName } = await initSession({ userId: OWNER });
+    const prompt = { method: "POST", body: { content: "Also add a test" } };
+
+    const reader = await issueToken(OWNER, ["sessions.read"]);
+    expect((await withToken(reader, "/sessions", { method: "POST", body: {} })).status).toBe(403);
+    expect((await withToken(reader, `/sessions/${sessionName}/prompt`, prompt)).status).toBe(403);
+
+    const writer = await issueToken(OWNER, [
+      "sessions.read",
+      "sessions.create",
+      "sessions.collaborate",
+    ]);
+    expect((await withToken(writer, "/sessions", { method: "POST", body: {} })).status).toBe(201);
+    expect((await withToken(writer, `/sessions/${sessionName}/prompt`, prompt)).ok).toBe(true);
+  });
+  it("leaves out the owner's personal memory unless the token was granted it", async () => {
+    const personalOwner = async (grant: PermissionId[]) => {
+      const token = await issueToken(OWNER, ["sessions.create", ...grant]);
+      const response = await withToken(token, "/sessions", {
+        method: "POST",
+        body: { includePersonalMemories: true },
+      });
+      expect(response.status).toBe(201);
+      const { sessionId } = await response.json<{ sessionId: string }>();
+      const stored = await new SessionMemorySelectionStore(env.DB).loadSelection(sessionId);
+      return stored?.selection.personalOwnerUserId ?? null;
+    };
+
+    expect(await personalOwner([])).toBeNull();
+    expect(await personalOwner(["memories.manage_own"])).toBe(OWNER);
   });
 });
 
