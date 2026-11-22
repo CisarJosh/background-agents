@@ -115,6 +115,21 @@ describe("createSandboxProviderFromEnv", () => {
     );
   });
 
+  describe("cloudflare", () => {
+    it("requires the container binding", () => {
+      expect(() => createSandboxProviderFromEnv(createEnv({}), "cloudflare")).toThrow(
+        "CLOUDFLARE_SANDBOXES container binding"
+      );
+    });
+
+    it("builds the provider over the container binding", () => {
+      const env = createEnv({
+        CLOUDFLARE_SANDBOXES: { start: vi.fn(), snapshot: vi.fn(), destroy: vi.fn() },
+      });
+      expect(createSandboxProviderFromEnv(env, "cloudflare").name).toBe("cloudflare");
+    });
+  });
+
   describe("ec2", () => {
     const ec2Sandboxes: Ec2SandboxApi = {
       launchInstance: vi.fn(),

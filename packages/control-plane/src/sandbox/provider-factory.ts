@@ -11,6 +11,10 @@ import { createE2BRestClient } from "./e2b-rest-client";
 import { resolveSandboxBackendName, type SandboxBackendName } from "./provider-name";
 import type { SandboxProvider } from "./provider";
 import { createBoatProvider, type BoatSandboxProvider } from "./providers/boat-provider";
+import {
+  createCloudflareProvider,
+  type CloudflareSandboxProvider,
+} from "./providers/cloudflare-provider";
 import { createDaytonaProvider, type DaytonaSandboxProvider } from "./providers/daytona-provider";
 import { createEc2Provider, type Ec2SandboxProvider } from "./providers/ec2-provider";
 import type { SandboxBootstrapStore } from "./bootstrap";
@@ -222,7 +226,22 @@ function createEc2ProviderFromEnv(
   });
 }
 
+function createCloudflareProviderFromEnv(env: Env): CloudflareSandboxProvider {
+  if (!env.CLOUDFLARE_SANDBOXES) {
+    throw new Error(
+      "SANDBOX_PROVIDER=cloudflare requires the Workers host deployed with the CLOUDFLARE_SANDBOXES container binding"
+    );
+  }
+  return createCloudflareProvider(env.CLOUDFLARE_SANDBOXES, {
+    scmProvider: resolveScmProviderFromEnv(env.SCM_PROVIDER),
+  });
+}
+
 export function createSandboxProviderFromEnv(env: Env, backend: "boat"): BoatSandboxProvider;
+export function createSandboxProviderFromEnv(
+  env: Env,
+  backend: "cloudflare"
+): CloudflareSandboxProvider;
 export function createSandboxProviderFromEnv(env: Env, backend: "daytona"): DaytonaSandboxProvider;
 export function createSandboxProviderFromEnv(env: Env, backend: "e2b"): E2BSandboxProvider;
 export function createSandboxProviderFromEnv(
@@ -248,6 +267,8 @@ export function createSandboxProviderFromEnv(
   switch (backend) {
     case "ec2":
       return createEc2ProviderFromEnv(env, bootstrapStore);
+    case "cloudflare":
+      return createCloudflareProviderFromEnv(env);
     case "boat":
       return createBoatProviderFromEnv(env);
     case "daytona":

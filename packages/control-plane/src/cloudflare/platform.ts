@@ -11,6 +11,8 @@ import { createLogger } from "../logger";
 import type { Env, EnvConfig, Platform } from "../types";
 import { createQueueJobs, type JobQueueBindings } from "./job-queue";
 import { R2ObjectStorage } from "./object-storage";
+import type { SandboxContainerDO } from "./sandbox-container";
+import { createCloudflareSandboxApi } from "./sandbox-container-dispatch";
 import {
   createDurableObjectSessionRuntimeDispatch,
   parseSessionDoLocationHint,
@@ -24,6 +26,8 @@ let cachedLocationHint:
 export interface WorkerBindings extends EnvConfig, JobQueueBindings {
   SESSION: DurableObjectNamespace;
   SESSION_DO_LOCATION_HINT?: string; // Placement hint for newly created session Durable Objects
+  CLOUDFLARE_SANDBOXES?: DurableObjectNamespace<SandboxContainerDO>;
+  CLOUDFLARE_SANDBOX_INSTANCE_TYPE?: string; // Instance type for every sandbox container; defaults to DEFAULT_SANDBOX_INSTANCE_TYPE
   REPOS_CACHE: KVNamespace;
   SLACK_BOT?: Fetcher;
   LINEAR_BOT?: Fetcher;
@@ -44,6 +48,8 @@ export function createCloudflareEnv(bindings: WorkerBindings): Env {
     SESSION,
     REPOS_CACHE,
     MEDIA_BUCKET,
+    CLOUDFLARE_SANDBOXES,
+    CLOUDFLARE_SANDBOX_INSTANCE_TYPE,
     SLACK_BOT,
     LINEAR_BOT,
     AUTOFIX_QUEUE,
@@ -62,6 +68,9 @@ export function createCloudflareEnv(bindings: WorkerBindings): Env {
     SESSION: createDurableObjectSessionRuntimeDispatch(SESSION, { locationHint }),
     REPOS_CACHE: createKvCacheStore(REPOS_CACHE),
     MEDIA_BUCKET: new R2ObjectStorage(MEDIA_BUCKET),
+    CLOUDFLARE_SANDBOXES:
+      CLOUDFLARE_SANDBOXES &&
+      createCloudflareSandboxApi(CLOUDFLARE_SANDBOXES, CLOUDFLARE_SANDBOX_INSTANCE_TYPE),
     SLACK_BOT,
     LINEAR_BOT,
     AUTOFIX_QUEUE,
@@ -77,5 +86,5 @@ export function createCloudflareEnv(bindings: WorkerBindings): Env {
 type _AssertExtends<A extends B, B> = A;
 type _BindingsAreConfigOrPlatform = _AssertExtends<
   Exclude<keyof WorkerBindings, keyof Platform | keyof JobQueueBindings>,
-  keyof EnvConfig | "SESSION_DO_LOCATION_HINT"
+  keyof EnvConfig | "SESSION_DO_LOCATION_HINT" | "CLOUDFLARE_SANDBOX_INSTANCE_TYPE"
 >;

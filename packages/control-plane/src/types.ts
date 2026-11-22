@@ -8,6 +8,7 @@ import type { Jobs } from "./jobs";
 import type { FetchClient, QueueMetricsSource } from "./platform-ports";
 import type { SessionRuntimeDispatch } from "./session/runtime-client";
 import type { ObjectStorage } from "./storage/object-storage";
+import type { CloudflareSandboxApi } from "./sandbox/cloudflare-api";
 import type { Ec2SandboxApi } from "./sandbox/ec2-api";
 
 /**
@@ -68,7 +69,7 @@ export interface EnvConfig {
   ALLOWED_GITHUB_ORGS?: string;
   UNSAFE_ALLOW_ALL_USERS?: string;
   CF_ACCOUNT_ID?: string; // Cloudflare account ID
-  SANDBOX_PROVIDER?: string; // "modal" (default), "modal-vm", "daytona", "vercel", "e2b", "boat", or "ec2"
+  SANDBOX_PROVIDER?: string; // "modal" (default), "modal-vm", "daytona", "vercel", "e2b", "boat", "ec2", or "cloudflare"
   MODAL_WORKSPACE?: string; // Modal workspace name
   MODAL_ENVIRONMENT?: string; // Modal environment name for dashboard URLs
   MODAL_ENVIRONMENT_WEB_SUFFIX?: string; // Modal environment web suffix for endpoint URLs
@@ -140,6 +141,8 @@ export interface Platform {
   MEDIA_BUCKET: ObjectStorage;
   /** EC2 control for the `ec2` sandbox provider; the Node host supplies it when that provider is selected. */
   EC2_SANDBOXES?: Ec2SandboxApi;
+  /** Container control for the `cloudflare` sandbox provider; the Worker supplies it when the container binding is deployed. */
+  CLOUDFLARE_SANDBOXES?: CloudflareSandboxApi;
   /** The slack-bot service, when deployed. */
   SLACK_BOT?: FetchClient;
   /** The linear-bot service, when deployed. */

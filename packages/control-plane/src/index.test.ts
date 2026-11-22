@@ -4,6 +4,7 @@ import type { WorkerBindings } from "./cloudflare/platform";
 
 // Node unit tests exercise the Worker entrypoint without loading workerd's DO base class.
 vi.mock("./cloudflare/durable-object", () => ({ SessionDO: class {} }));
+vi.mock("./cloudflare/sandbox-container", () => ({ SandboxContainerDO: class {} }));
 
 afterEach(() => vi.restoreAllMocks());
 

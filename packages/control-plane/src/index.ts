@@ -24,6 +24,7 @@ const logger = createLogger("worker");
 
 // Re-export Durable Objects for Cloudflare to discover
 export { SessionDO } from "./cloudflare/durable-object";
+export { SandboxContainerDO } from "./cloudflare/sandbox-container";
 
 export default {
   async fetch(
