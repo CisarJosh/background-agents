@@ -23,6 +23,10 @@ Build on a `linux/amd64` machine. Cloudflare runs only that platform, and the im
 check makes system calls that emulation on an Arm machine does not implement, so the build fails
 there at its last step. The `cloudflare-sandbox-image` workflow builds on a GitHub-hosted runner.
 
+Without a registry credential the workflow saves the checked image as an artifact instead of pushing
+it. Load it with `docker load`, then tag and push it to
+`registry.cloudflare.com/<account id>/openinspect-sandbox:<tag>` from a machine that has one.
+
 ## Registry credentials
 
 The build needs Docker and a credential that can push to the account's registry:

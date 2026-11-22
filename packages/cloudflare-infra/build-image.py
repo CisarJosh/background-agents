@@ -58,6 +58,13 @@ def main() -> None:
     if platform.machine() in ("x86_64", "AMD64"):
         subprocess.run(["docker", "run", "--rm", "--platform", "linux/amd64", tag], check=True)
 
+    # Without a registry credential on this machine, hand the checked image over as a file.
+    archive = os.environ.get("OPENINSPECT_IMAGE_ARCHIVE")
+    if archive:
+        subprocess.run(["docker", "save", "--output", archive, tag], check=True)
+        write_build_result(tag)
+        return
+
     credentials = registry_credentials()
     remote = f"{REGISTRY}/{credentials['account_id']}/{tag}"
     subprocess.run(

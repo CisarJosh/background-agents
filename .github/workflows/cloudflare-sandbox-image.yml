@@ -5,8 +5,13 @@ name: Cloudflare sandbox image
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "**"
     tags:
       - "cloudflare-sandbox-image-*"
+    paths:
+      - "packages/cloudflare-infra/**"
+      - ".github/workflows/cloudflare-sandbox-image.yml"
 
 permissions:
   contents: read
@@ -25,14 +30,25 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.9.7"
-      - name: Build, check and push
+      # With a registry credential the image is pushed. Without one it is saved as an artifact,
+      # to be loaded and pushed from a machine that has a credential.
+      - name: Build, check, and push or save
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_REGISTRY_PASSWORD: ${{ secrets.CLOUDFLARE_REGISTRY_PASSWORD }}
-        run: python3 packages/sandbox-images/cli.py build --provider cloudflare --output "$RUNNER_TEMP/image.json"
-      # The account id is part of the reference, so only the digest is published.
-      - name: Report the image digest
         run: |
-          digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reference"].split("@")[1])' "$RUNNER_TEMP/image.json")
-          echo "openinspect-sandbox@$digest" >> "$GITHUB_STEP_SUMMARY"
-          echo "digest=$digest"
+          if [ -z "$CLOUDFLARE_REGISTRY_PASSWORD" ]; then
+            export OPENINSPECT_IMAGE_ARCHIVE="$RUNNER_TEMP/openinspect-sandbox.tar"
+          fi
+          python3 packages/sandbox-images/cli.py build --provider cloudflare --output "$RUNNER_TEMP/image.json"
+          cat "$RUNNER_TEMP/image.json" | sed -E 's#registry.cloudflare.com/[^/]+/##' >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$OPENINSPECT_IMAGE_ARCHIVE" ]; then
+            zstd -T0 -3 --rm "$OPENINSPECT_IMAGE_ARCHIVE"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openinspect-sandbox-image
+          path: ${{ runner.temp }}/openinspect-sandbox.tar.zst
+          if-no-files-found: ignore
+          retention-days: 1
+          compression-level: 0
