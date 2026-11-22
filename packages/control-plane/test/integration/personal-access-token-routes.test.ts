@@ -12,7 +12,7 @@ import { PersonalAccessTokenStore } from "../../src/db/personal-access-tokens";
 import { SessionIndexStore } from "../../src/db/session-index";
 import { SessionMemorySelectionStore } from "../../src/db/session-memory-selections";
 import { cleanD1Tables } from "./cleanup";
-import { initSession, seedActiveUser, seedEvents } from "./helpers";
+import { initSession, queryDO, seedActiveUser, seedEvents } from "./helpers";
 import { fetchRuns } from "./run-helpers";
 import { seedEnvironment } from "./ownership-test-helpers";
 
@@ -147,6 +147,28 @@ describe("starting and steering sessions with a token", () => {
     expect((await withToken(writer, "/sessions", { method: "POST", body: {} })).status).toBe(201);
     expect((await withToken(writer, `/sessions/${sessionName}/prompt`, prompt)).ok).toBe(true);
   });
+  it("prompts under no account unless the token was granted personal memory", async () => {
+    const promptAccount = async (grant: PermissionId[], content: string) => {
+      const { stub, sessionName } = await initSession({ userId: OWNER });
+      const token = await issueToken(OWNER, ["sessions.read", "sessions.collaborate", ...grant]);
+      const response = await withToken(token, `/sessions/${sessionName}/prompt`, {
+        method: "POST",
+        body: { content },
+      });
+      expect(response.ok).toBe(true);
+      const rows = await queryDO<{ author_canonical_user_id: string | null }>(
+        stub,
+        "SELECT author_canonical_user_id FROM messages WHERE content = ?",
+        content
+      );
+      expect(rows).toHaveLength(1);
+      return rows[0].author_canonical_user_id;
+    };
+
+    expect(await promptAccount([], "without the memory grant")).toBeNull();
+    expect(await promptAccount(["memories.manage_own"], "with the memory grant")).toBe(OWNER);
+  });
+
   it("leaves out the owner's personal memory unless the token was granted it", async () => {
     const personalOwner = async (grant: PermissionId[]) => {
       const token = await issueToken(OWNER, ["sessions.create", ...grant]);

@@ -124,6 +124,13 @@ export async function handleSessionPrompt(
           email: enrichment.email ?? null,
         }
       : undefined,
+    // Personal memory follows the account a prompt counts as, which a token's grant does not
+    // narrow. A token that was not granted personal memory prompts under no account, so the
+    // session treats the prompt as someone else's.
+    ...(ctx.principal?.kind === "personal-access-token" &&
+    !ctx.authorization?.permissions.includes("memories.manage_own")
+      ? { promptAccountUserId: null }
+      : {}),
   } satisfies EnqueuePromptRequest;
 
   const response = await ctx.sessionRuntime.fetch(sessionId, SessionInternalPaths.prompt, {
